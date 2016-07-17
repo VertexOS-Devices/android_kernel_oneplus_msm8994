@@ -2492,6 +2492,10 @@ static int	synaptics_input_init(struct synaptics_ts_data *ts)
 	set_bit(KEY_GESTURE_LEFT_V, ts->input_dev->keybit);
 	set_bit(KEY_GESTURE_RIGHT_V, ts->input_dev->keybit);
 #endif
+	set_bit(BTN_TOOL_FINGER, ts->input_dev->keybit);
+	set_bit(KEY_WAKEUP , ts->input_dev->keybit);
+	for (i = 250; i <= 248 + Down2UpSwip; i++)
+		set_bit(i, ts->input_dev->keybit);
 #endif
 	/* For multi touch */
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
