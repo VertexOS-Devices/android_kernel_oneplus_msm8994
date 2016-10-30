@@ -647,6 +647,19 @@ config KERNEL_TEXT_MPU_PROT
 	  sections early in boot. Read access is permitted to
 	  all masters; Write access is only permited to the
 	  secure world.
+config STATE_NOTIFIER
+        bool "State Notifier"
+
+config STATE_HELPER
+        bool "State Helper"
+	depends on STATE_NOTIFIER
+
+config AUTOSMP
+	bool "Multi-core automatic hotplug support"
+	depends on SMP && HOTPLUG_CPU
+	help
+	  Automatically hotplugs the multiple cpu cores on and off
+	  based on cpu load and suspend state
 
 source "drivers/soc/qcom/memshare/Kconfig"
 
