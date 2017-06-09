@@ -1832,80 +1832,22 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 
 	switch (usb_supply_type) {
 	case POWER_SUPPLY_TYPE_USB:
-		if (current_ma < CURRENT_150_MA) {
-			/* force 100mA */
-			rc = smbchg_sec_masked_write(chip,
-					chip->usb_chgpth_base + CHGPTH_CFG,
-					CFG_USB_2_3_SEL_BIT, CFG_USB_2);
-			if (rc < 0) {
-				pr_err("Couldn't set CHGPTH_CFG rc = %d\n", rc);
-				goto out;
-			}
-			rc = smbchg_masked_write(chip,
-					chip->usb_chgpth_base + CMD_IL,
-					USBIN_MODE_CHG_BIT | USB51_MODE_BIT,
-					USBIN_LIMITED_MODE | USB51_100MA);
-			if (rc < 0) {
-				pr_err("Couldn't set CMD_IL rc = %d\n", rc);
-				goto out;
-			}
-			chip->usb_max_current_ma = 100;
+		rc = smbchg_sec_masked_write(chip,
+				chip->usb_chgpth_base + CHGPTH_CFG,
+				CFG_USB_2_3_SEL_BIT, CFG_USB_3);
+		if (rc < 0) {
+			pr_err("Couldn't set CHGPTH_CFG rc = %d\n", rc);
+			goto out;
 		}
-		/* specific current values */
-		if (current_ma == CURRENT_150_MA) {
-			rc = smbchg_sec_masked_write(chip,
-					chip->usb_chgpth_base + CHGPTH_CFG,
-					CFG_USB_2_3_SEL_BIT, CFG_USB_3);
-			if (rc < 0) {
-				pr_err("Couldn't set CHGPTH_CFG rc = %d\n", rc);
-				goto out;
-			}
-			rc = smbchg_masked_write(chip,
-					chip->usb_chgpth_base + CMD_IL,
-					USBIN_MODE_CHG_BIT | USB51_MODE_BIT,
-					USBIN_LIMITED_MODE | USB51_100MA);
-			if (rc < 0) {
-				pr_err("Couldn't set CMD_IL rc = %d\n", rc);
-				goto out;
-			}
-			chip->usb_max_current_ma = 150;
+		rc = smbchg_masked_write(chip,
+				chip->usb_chgpth_base + CMD_IL,
+				USBIN_MODE_CHG_BIT | USB51_MODE_BIT,
+				USBIN_LIMITED_MODE | USB51_500MA);
+		if (rc < 0) {
+			pr_err("Couldn't set CMD_IL rc = %d\n", rc);
+			goto out;
 		}
-		if (current_ma == CURRENT_500_MA) {
-			rc = smbchg_sec_masked_write(chip,
-					chip->usb_chgpth_base + CHGPTH_CFG,
-					CFG_USB_2_3_SEL_BIT, CFG_USB_2);
-			if (rc < 0) {
-				pr_err("Couldn't set CHGPTH_CFG rc = %d\n", rc);
-				goto out;
-			}
-			rc = smbchg_masked_write(chip,
-					chip->usb_chgpth_base + CMD_IL,
-					USBIN_MODE_CHG_BIT | USB51_MODE_BIT,
-					USBIN_LIMITED_MODE | USB51_500MA);
-			if (rc < 0) {
-				pr_err("Couldn't set CMD_IL rc = %d\n", rc);
-				goto out;
-			}
-			chip->usb_max_current_ma = 500;
-		}
-		if (current_ma == CURRENT_900_MA) {
-			rc = smbchg_sec_masked_write(chip,
-					chip->usb_chgpth_base + CHGPTH_CFG,
-					CFG_USB_2_3_SEL_BIT, CFG_USB_3);
-			if (rc < 0) {
-				pr_err("Couldn't set CHGPTH_CFG rc = %d\n", rc);
-				goto out;
-			}
-			rc = smbchg_masked_write(chip,
-					chip->usb_chgpth_base + CMD_IL,
-					USBIN_MODE_CHG_BIT | USB51_MODE_BIT,
-					USBIN_LIMITED_MODE | USB51_500MA);
-			if (rc < 0) {
-				pr_err("Couldn't set CMD_IL rc = %d\n", rc);
-				goto out;
-			}
-			chip->usb_max_current_ma = 900;
-		}
+		chip->usb_max_current_ma = 2000;
 		break;
 	case POWER_SUPPLY_TYPE_USB_CDP:
 		if (current_ma < CURRENT_1500_MA) {
