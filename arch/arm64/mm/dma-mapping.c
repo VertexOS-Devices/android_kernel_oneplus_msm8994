@@ -497,6 +497,7 @@ static void arm64_dma_unremap(struct device *dev, void *remapped_addr,
 {
 	struct vm_struct *area;
 
+	size = PAGE_ALIGN(size);
 	remapped_addr = (void *)((unsigned long)remapped_addr & PAGE_MASK);
 
 	area = find_vm_area(remapped_addr);
@@ -506,6 +507,8 @@ static void arm64_dma_unremap(struct device *dev, void *remapped_addr,
 		return;
 	}
 	vunmap(remapped_addr);
+	flush_tlb_kernel_range((unsigned long)remapped_addr,
+			(unsigned long)(remapped_addr + size));
 }
 
 const struct dma_map_ops noncoherent_swiotlb_dma_ops = {
@@ -1215,7 +1218,8 @@ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg,
 	struct scatterlist *s;
 	int ret, i;
 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-	unsigned int iova, total_length = 0, current_offset = 0;
+	unsigned int total_length = 0, current_offset = 0;
+	dma_addr_t iova;
 	int prot = __dma_direction_to_prot(dir);
 
 	for_each_sg(sg, s, nents, i)
@@ -1286,7 +1290,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 {
 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
 	unsigned int total_length = sg_dma_len(sg);
-	unsigned int iova = sg_dma_address(sg);
+	dma_addr_t iova = sg_dma_address(sg);
 
 	total_length = PAGE_ALIGN((iova & ~PAGE_MASK) + total_length);
 	iova &= PAGE_MASK;
