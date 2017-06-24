@@ -7814,21 +7814,43 @@ static int fb_notifier_callback(struct notifier_block *self,
 	//union power_supply_propval ret = {0,};
 	pr_debug(" %s enter\n",__func__);
 
-	if (evdata && evdata->data && chip) {
+	 if (evdata && evdata->data && chip) {
 		if (event == FB_EVENT_BLANK) {
-			blank = evdata->data;
-			if (*blank == FB_BLANK_UNBLANK || *blank == FB_BLANK_POWERDOWN) {
-				/* hack OEM callback function to raise up charging speed with screen on */
-				chip->oem_lcd_is_on = false;
-				if (chip->aicl_current != 0) {
-					smbchg_set_usb_current_max(chip, calc_thermal_limited_current(chip, chip->aicl_current));
-					smbchg_rerun_aicl(chip);
-				}
-			}
-		}
-	}
+				 blank = evdata->data;
+	     if (*blank == FB_BLANK_UNBLANK) {
+		 chip->oem_lcd_is_on =true ;
+					/* yangfangbiao@oneplus.cn,20150519  Add for auto adapt current by software. */
+					pr_debug(" %s FB_BLANK_UNBLANK\n",__func__);
+					if(chip->aicl_current != 0) {
+						if (chip->aicl_current >= chip->lcd_on_iusb) {
+							/* yangfangbiao@oneplus.cn,20150710  Add for usb thermal current limit */
+							smbchg_set_usb_current_max(chip, calc_thermal_limited_current(chip, chip->lcd_on_iusb));
+							smbchg_rerun_aicl(chip);
 
-	return 0;
+						} else {
+							/* yangfangbiao@oneplus.cn,20150710  Add for usb thermal current limit */
+							smbchg_set_usb_current_max(chip, calc_thermal_limited_current(chip, chip->aicl_current));
+							smbchg_rerun_aicl(chip);
+						}
+						}
+					}
+
+	else if (*blank == FB_BLANK_POWERDOWN) {
+					/* yangfangbiao@oneplus.cn,20150519  Add for auto adapt current by software. */
+					chip->oem_lcd_is_on =false;
+					pr_debug(" %s FB_BLANK_POWERDOWN\n",__func__);
+					if(chip->aicl_current != 0) {
+						/* yangfangbiao@oneplus.cn,20150710  Add for usb thermal current limit */
+						smbchg_set_usb_current_max(chip, calc_thermal_limited_current(chip, chip->aicl_current));
+						smbchg_rerun_aicl(chip);
+					}
+
+				}
+			 }
+
+	 }
+
+	 return 0;
 }
 #endif /*CONFIG_FB*/
 
