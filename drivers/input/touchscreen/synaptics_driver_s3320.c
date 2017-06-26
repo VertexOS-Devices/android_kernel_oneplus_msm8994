@@ -2462,7 +2462,7 @@ static int	synaptics_input_init(struct synaptics_ts_data *ts)
 {
 	int attr_count = 0;
 	int ret = 0;
-
+	int i=0;
 	TPD_DEBUG("%s is called\n",__func__);
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {
