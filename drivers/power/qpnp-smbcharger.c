@@ -4691,7 +4691,7 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 			|| qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__NORMAL
 			|| qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__PRE_NORMAL
 			|| qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__COOL)
-			&& (90 < get_prop_batt_capacity(chip)))
+			&& (100 < get_prop_batt_capacity(chip)))
 			val->intval = POWER_SUPPLY_STATUS_FULL;
 #endif
 
