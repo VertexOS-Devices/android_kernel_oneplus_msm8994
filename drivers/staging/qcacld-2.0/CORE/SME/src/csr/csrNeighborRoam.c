@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2051,14 +2051,6 @@ csrNeighborRoamProcessScanResults(tpAniSirGlobal pMac,
                            "SKIP-currently associated AP");
                 continue;
             }
-            if (vos_concurrent_open_sessions_running() &&
-               !pMac->roam.configParam.fenableMCCMode &&
-               (pScanResult->BssDescriptor.channelId !=
-               csrGetConcurrentOperationChannel(pMac))) {
-                smsLog(pMac, LOG1, FL("MCC not supported so Ignore AP on channel %d"),
-                    pScanResult->BssDescriptor.channelId);
-                continue;
-            }
 
 #ifdef FEATURE_WLAN_LFR
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
@@ -2088,7 +2080,7 @@ csrNeighborRoamProcessScanResults(tpAniSirGlobal pMac,
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
               && !csrRoamIsRoamOffloadScanEnabled(pMac)
 #endif
-              && ((eSME_ROAM_TRIGGER_SCAN != pNeighborRoamInfo->cfgRoamEn) &&
+              && ((eSME_ROAM_TRIGGER_SCAN != pNeighborRoamInfo->cfgRoamEn) ||
                (eSME_ROAM_TRIGGER_FAST_ROAM != pNeighborRoamInfo->cfgRoamEn))) {
                 /*
                  * If RSSI is lower than the lookup threshold, then continue.
@@ -3972,7 +3964,7 @@ void csrNeighborRoamRRMNeighborReportResult(void *context, VOS_STATUS vosStatus)
 
                 /* We are gonna scan now. Remember the time stamp to filter out
                    results only after this time stamp */
-                pNeighborRoamInfo->scanRequestTimeStamp = vos_timer_get_system_time();
+                pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
 
                 /* Now ready for neighbor scan based on the channel list created */
                 status = vos_timer_start(&pNeighborRoamInfo->neighborScanTimer,
@@ -4376,8 +4368,7 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac,
                 pNeighborRoamInfo->lookupDOWNRssi,
                 pNeighborRoamInfo->cfgParams.neighborReassocThreshold*(-1));
 
-            pNeighborRoamInfo->scanRequestTimeStamp =
-                                          vos_timer_get_system_time();
+            pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
 
             vos_timer_stop(&pNeighborRoamInfo->neighborScanTimer);
 
@@ -4567,7 +4558,7 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac,
 
     /* We are gonna scan now. Remember the time stamp to filter out results
        only after this time stamp */
-    pNeighborRoamInfo->scanRequestTimeStamp = vos_timer_get_system_time();
+    pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
 
     vos_timer_stop(&pNeighborRoamInfo->neighborScanTimer);
     status = vos_timer_start(&pNeighborRoamInfo->neighborScanTimer,
@@ -5610,7 +5601,7 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac, tANI_U8 sessionId)
     }
 #endif
     /* Initialize this with the current tick count */
-    pNeighborRoamInfo->scanRequestTimeStamp = vos_timer_get_system_time();
+    pNeighborRoamInfo->scanRequestTimeStamp = (tANI_TIMESTAMP)palGetTickCount(pMac->hHdd);
 
     CSR_NEIGHBOR_ROAM_STATE_TRANSITION(eCSR_NEIGHBOR_ROAM_STATE_INIT, sessionId)
     pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = eANI_BOOLEAN_FALSE;
@@ -6327,8 +6318,7 @@ eHalStatus csrNeighborRoamProceedWithHandoffReq(tpAniSirGlobal pMac,
     if ((eCSR_NEIGHBOR_ROAM_STATE_CONNECTED != pNeighborRoamInfo->neighborRoamState)
         || (!pNeighborRoamInfo->uOsRequestedHandoff))
     {
-        smsLog(pMac, LOGE, FL("Received in not CONNECTED state(%d) or uOsRequestedHandoff(%d) is not set. Ignore it "),
-                                    pNeighborRoamInfo->neighborRoamState, pNeighborRoamInfo->uOsRequestedHandoff);
+        smsLog(pMac, LOGE, FL("Received in not CONNECTED state or uOsRequestedHandoff is not set. Ignore it"));
         status = eHAL_STATUS_FAILURE;
     }
     else

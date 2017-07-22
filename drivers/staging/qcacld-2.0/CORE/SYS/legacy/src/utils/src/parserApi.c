@@ -366,7 +366,6 @@ PopulateDot11fChanSwitchWrapper(tpAniSirGlobal pMac,
                             tDot11fIEChannelSwitchWrapper *pDot11f,
                             tpPESession psessionEntry)
 {
-    uint8_t *ie_ptr = NULL;
     /*
      * The new country subelement is present only when
      * 1. AP performs Extended Channel switching to new country.
@@ -396,20 +395,6 @@ PopulateDot11fChanSwitchWrapper(tpAniSirGlobal pMac,
                      psessionEntry->gLimWiderBWChannelSwitch.newCenterChanFreq1;
      pDot11f->WiderBWChanSwitchAnn.present = 1;
 
-     /*
-      * Add the VHT Transmit power Envelope Sublement.
-      */
-     ie_ptr = lim_get_ie_ptr(psessionEntry->addIeParams.probeRespBCNData_buff,
-               psessionEntry->addIeParams.probeRespBCNDataLen,
-               DOT11F_EID_VHT_TRANSMIT_POWER_ENV);
-     if (ie_ptr) {
-         /* Ignore EID field */
-         ie_ptr++;
-         pDot11f->vht_transmit_power_env.present = 1;
-         pDot11f->vht_transmit_power_env.num_bytes = *ie_ptr++;
-         vos_mem_copy(pDot11f->vht_transmit_power_env.bytes,
-            ie_ptr, pDot11f->vht_transmit_power_env.num_bytes);
-     }
 }
 
 #ifdef WLAN_FEATURE_11AC
@@ -2231,28 +2216,7 @@ tSirRetStatus sirvalidateandrectifyies(tpAniSirGlobal pMac,
                        FL("Added RSN Capability to the RSNIE as 0x00 0x00"));
 
                 return eHAL_STATUS_SUCCESS;
-            } else {
-                /*
-                 * Workaround: Some APs may add extra 0x00 padding after IEs.
-                 * Return true to allow these probe response frames proceed.
-                 */
-                if (nFrameBytes - length > 0) {
-                    tANI_U32 i;
-                    tANI_BOOLEAN zero_padding = VOS_TRUE;
-
-                    for (i = length; i < nFrameBytes; i ++) {
-                        if (pMgmtFrame[i-1] != 0x0) {
-                            zero_padding = VOS_FALSE;
-                            break;
-                        }
-                    }
-
-                    if (zero_padding) {
-                        return eHAL_STATUS_SUCCESS;
-                    }
-                }
             }
-
             return eSIR_FAILURE;
         }
     }
@@ -3363,19 +3327,15 @@ sirFillBeaconMandatoryIEforEseBcnReport(tpAniSirGlobal   pMac,
         retStatus = eSIR_FAILURE;
         goto err_bcnrep;
       }
-      if (eseBcnReportMandatoryIe.supportedRates.numRates <=
-            SIR_MAC_RATESET_EID_MAX) {
-          *pos = SIR_MAC_RATESET_EID;
-          pos++;
-          *pos = eseBcnReportMandatoryIe.supportedRates.numRates;
-          pos++;
-          vos_mem_copy(pos,
+      *pos = SIR_MAC_RATESET_EID;
+      pos++;
+      *pos = eseBcnReportMandatoryIe.supportedRates.numRates;
+      pos++;
+      vos_mem_copy(pos,
                    (tANI_U8*)eseBcnReportMandatoryIe.supportedRates.rate,
                    eseBcnReportMandatoryIe.supportedRates.numRates);
-          pos += eseBcnReportMandatoryIe.supportedRates.numRates;
-          freeBytes -= (1 + 1 +
-                   eseBcnReportMandatoryIe.supportedRates.numRates);
-      }
+      pos += eseBcnReportMandatoryIe.supportedRates.numRates;
+      freeBytes -= (1 + 1 + eseBcnReportMandatoryIe.supportedRates.numRates);
     }
 
     /* Fill FH Parameter set IE */

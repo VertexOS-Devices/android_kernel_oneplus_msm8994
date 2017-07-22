@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -65,17 +65,6 @@ typedef void (*__adf_nbuf_callback_fn) (struct sk_buff *skb);
 #define CVG_NBUF_MAX_EXTRA_FRAGS 2
 
 typedef void (*adf_nbuf_trace_update_t)(char *);
-struct nbuf_rx_cb {
-	uint8_t dp_trace:1,
-		    reserved:7;
-	uint8_t packet_trace;
-};
-
-#define ADF_NBUF_CB_RX_DP_TRACE(skb) \
-	(((struct nbuf_rx_cb*)((skb)->cb))->dp_trace)
-
-#define ADF_NBUF_CB_RX_PACKET_TRACE(skb) \
-	(((struct nbuf_rx_cb*)((skb)->cb))->packet_trace)
 
 struct cvg_nbuf_cb {
     /*
@@ -99,10 +88,10 @@ struct cvg_nbuf_cb {
      * Store info for data path tracing
      */
     struct {
-        uint8_t packet_state: 4;
-        uint8_t packet_track: 2;
-        uint8_t dp_trace: 1;
-        uint8_t dp_trace_reserved: 1;
+        uint8_t packet_state:4;
+        uint8_t packet_track:2;
+        uint8_t dp_trace_tx:1;
+        uint8_t dp_trace_rx:1;
     } trace;
 
     /*
@@ -149,20 +138,19 @@ struct cvg_nbuf_cb {
     unsigned char proto_type;
     unsigned char vdev_id;
 #endif /* QCA_PKT_PROTO_TRACE */
-#ifdef QOS_FWD_SUPPORT
-    unsigned char fwd_flag: 1;
-#endif /* QOS_FWD_SUPPORT */
 #ifdef QCA_TX_HTT2_SUPPORT
     unsigned char tx_htt2_frm: 1;
+    unsigned char tx_htt2_reserved: 7;
 #endif /* QCA_TX_HTT2_SUPPORT */
     struct {
-        uint8_t is_eapol: 1;
-        uint8_t is_arp: 1;
-        uint8_t is_dhcp: 1;
-        uint8_t is_wapi: 1;
-        uint8_t is_mcast: 1;
-        uint8_t is_bcast: 1;
-        uint8_t reserved: 2;
+        uint8_t is_eapol:1;
+        uint8_t is_arp:1;
+        uint8_t is_dhcp:1;
+        uint8_t is_wapi:1;
+        uint8_t is_mcast:1;
+        uint8_t is_bcast:1;
+        uint8_t reserved:1;
+        uint8_t print:1;
     } packet_type;
 } __packed;
 
@@ -210,16 +198,6 @@ struct cvg_nbuf_cb {
 #define NBUF_SET_PROTO_TYPE(skb, proto_type);
 #define NBUF_GET_PROTO_TYPE(skb) 0;
 #endif /* QCA_PKT_PROTO_TRACE */
-
-#ifdef QOS_FWD_SUPPORT
-#define NBUF_SET_FWD_FLAG(skb, flag) \
-    (((struct cvg_nbuf_cb *)((skb)->cb))->fwd_flag = flag)
-#define NBUF_GET_FWD_FLAG(skb) \
-    (((struct cvg_nbuf_cb *)((skb)->cb))->fwd_flag)
-#else
-#define NBUF_SET_FWD_FLAG(skb, fwd_flag);
-#define NBUF_GET_FWD_FLAG(skb) 0;
-#endif /* QOS_FWD_SUPPORT */
 
 #ifdef QCA_TX_HTT2_SUPPORT
 #define NBUF_SET_TX_HTT2_FRM(skb, candi) \
@@ -271,7 +249,13 @@ struct cvg_nbuf_cb {
     adf_nbuf_set_state(skb, PACKET_STATE)
 
 #define ADF_NBUF_CB_TX_DP_TRACE(skb) \
-    (((struct cvg_nbuf_cb *)((skb)->cb))->trace.dp_trace)
+    (((struct cvg_nbuf_cb *)((skb)->cb))->trace.dp_trace_tx)
+
+#define ADF_NBUF_CB_DP_TRACE_PRINT(skb) \
+	(((struct cvg_nbuf_cb *)((skb)->cb))->packet_type.print)
+
+#define ADF_NBUF_CB_RX_DP_TRACE(skb) \
+    (((struct cvg_nbuf_cb *)((skb)->cb))->trace.dp_trace_rx)
 
 #define ADF_NBUF_GET_IS_EAPOL(skb) \
     (((struct cvg_nbuf_cb *)((skb)->cb))->packet_type.is_eapol)
@@ -344,11 +328,6 @@ struct cvg_nbuf_cb {
     NBUF_SET_PROTO_TYPE(skb, proto_type)
 #define __adf_nbuf_trace_get_proto_type(skb) \
     NBUF_GET_PROTO_TYPE(skb);
-
-#define __adf_nbuf_set_fwd_flag(skb, flag) \
-    NBUF_SET_FWD_FLAG(skb, flag)
-#define __adf_nbuf_get_fwd_flag(skb) \
-    NBUF_GET_FWD_FLAG(skb);
 
 typedef struct __adf_nbuf_qhead {
     struct sk_buff   *head;

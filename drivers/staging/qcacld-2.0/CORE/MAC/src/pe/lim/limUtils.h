@@ -398,7 +398,6 @@ tSirRetStatus limPostSMStateUpdate(tpAniSirGlobal pMac,
 void limDeleteStaContext(tpAniSirGlobal pMac, tpSirMsgQ limMsg);
 void limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg);
 void limDeleteBASessions(tpAniSirGlobal pMac, tpPESession pSessionEntry, tANI_U32 baDirection);
-void limDelPerBssBASessionsBtc(tpAniSirGlobal pMac);
 void limDelAllBASessions(tpAniSirGlobal pMac);
 void limDeleteDialogueTokenList(tpAniSirGlobal pMac);
 tSirRetStatus limSearchAndDeleteDialogueToken(tpAniSirGlobal pMac, tANI_U8 token, tANI_U16 assocId, tANI_U16 tid);
@@ -673,6 +672,6 @@ void lim_update_caps_info_for_bss(tpAniSirGlobal mac_ctx,
 void lim_parse_beacon_for_tim(tpAniSirGlobal mac_ctx, uint8_t* rx_packet_info,
 	tpPESession session);
 eHalStatus limP2PActionCnf(tpAniSirGlobal mac_ctx,
-				uint32_t tx_complete_success);
+                               uint32_t tx_complete_success);
 
 #endif /* __LIM_UTILS_H */

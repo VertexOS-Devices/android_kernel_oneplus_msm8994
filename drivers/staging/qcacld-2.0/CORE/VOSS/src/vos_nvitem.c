@@ -428,7 +428,6 @@ static CountryInfoTable_t countryInfoTable =
       {REGDOMAIN_ETSI, {'Y', 'T'}}, //MAYOTTE
       {REGDOMAIN_ETSI, {'Z', 'A'}}, //SOUTH AFRICA
       {REGDOMAIN_ETSI, {'Z', 'W'}}, //ZIMBABWE
-      {REGDOMAIN_JAPAN, {'X', 'A'}}, //JAPAN PASSIVE
     }
 };
 
@@ -909,7 +908,7 @@ static void vos_set_5g_channel_params(uint16_t oper_ch,
 				      struct ch_params_s *ch_params)
 {
 	eNVChannelEnabledType chan_state = NV_CHANNEL_ENABLE;
-	const struct bonded_chan *bonded_chan_ptr;
+	const struct bonded_chan *bonded_chan_ptr = NULL;
 	uint16_t center_chan;
 
 	if (CH_WIDTH_MAX <= ch_params->ch_width)
@@ -2453,4 +2452,3 @@ VOS_STATUS vos_init_wiphy_from_nv_bin(void)
 
     return VOS_STATUS_SUCCESS;
 }
-
