@@ -68,8 +68,9 @@ obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
 obj-$(CONFIG_QCOM_LIQUID_DOCK)	+= qcom_liquid_dock.o
 obj-y				+= qcom/
+obj-$(CONFIG_UID_SYS_STATS) += uid_sys_stats.o
+
 #ifdef VENDOR_EDIT
 #shankai@bsp, 2015/2/2, Add for :drv2605 kernel support 
 obj-$(CONFIG_TI_DRV2605) += ti_drv2605.o
 #endif VENDOR_EDIT
-

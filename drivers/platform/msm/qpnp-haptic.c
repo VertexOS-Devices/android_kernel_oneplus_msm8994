@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/qpnp/qpnp-haptic.h>
 #include "../../staging/android/timed_output.h"
+#include <linux/spinlock.h>
 
 #define QPNP_IRQ_FLAGS	(IRQF_TRIGGER_RISING | \
 			IRQF_TRIGGER_FALLING | \
@@ -237,7 +238,7 @@ struct qpnp_pwm_info {
  *  @ work - worker
  *  @ auto_res_err_work - correct auto resonance error
  *  @ pwm_info - pwm info
- *  @ lock - mutex lock
+ *  @ lock - spinlock
  *  @ wf_lock - mutex lock for waveform
  *  @ play_mode - play mode
  *  @ auto_res_mode - auto resonace mode
@@ -283,7 +284,7 @@ struct qpnp_hap {
 	struct hrtimer hap_test_timer;
 	struct work_struct test_work;
 	struct qpnp_pwm_info pwm_info;
-	struct mutex lock;
+	spinlock_t lock;
 	struct mutex wf_lock;
 	struct mutex set_lock;
 	struct workqueue_struct *wq;
@@ -659,7 +660,7 @@ static int qpnp_hap_play_mode_config(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* configuration api for max volatge */
+/* configuration api for max voltage */
 static int qpnp_hap_vmax_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0;
@@ -1177,7 +1178,7 @@ static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
 
 	int value = QPNP_TEST_TIMER_MS, i;
 
-	mutex_lock(&hap->lock);
+	spin_lock(&hap->lock);
 	qpnp_hap_mod_enable(hap, true);
 	for (i = 0; i < ARRAY_SIZE(qpnp_hap_min_max_test_data); i++) {
 		hrtimer_start(&hap->hap_test_timer,
@@ -1189,7 +1190,7 @@ static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
 
 	qpnp_hap_play_byte(0, false);
 	qpnp_hap_mod_enable(hap, false);
-	mutex_unlock(&hap->lock);
+	spin_unlock(&hap->lock);
 
 	return count;
 }
@@ -1223,7 +1224,7 @@ static ssize_t qpnp_hap_ramp_test_data_store(struct device *dev,
 
 	int value = QPNP_TEST_TIMER_MS, i;
 
-	mutex_lock(&hap->lock);
+	spin_lock(&hap->lock);
 	qpnp_hap_mod_enable(hap, true);
 	for (i = 0; i < ARRAY_SIZE(qpnp_hap_ramp_test_data); i++) {
 		hrtimer_start(&hap->hap_test_timer,
@@ -1235,7 +1236,7 @@ static ssize_t qpnp_hap_ramp_test_data_store(struct device *dev,
 
 	qpnp_hap_play_byte(0, false);
 	qpnp_hap_mod_enable(hap, false);
-	mutex_unlock(&hap->lock);
+	spin_unlock(&hap->lock);
 
 	return count;
 }
@@ -1570,11 +1571,11 @@ static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 				/*
 				 * Start timer to poll Auto Resonance error bit
 				 */
-				mutex_lock(&hap->lock);
+				spin_lock(&hap->lock);
 				hrtimer_start(&hap->auto_res_err_poll_timer,
 						ktime_set(0, timeout_ns),
 						 HRTIMER_MODE_REL);
-				mutex_unlock(&hap->lock);
+				spin_unlock(&hap->lock);
 			}
 		} else {
 			rc = qpnp_hap_play(hap, on);
@@ -1645,12 +1646,12 @@ static void qpnp_timed_enable_worker(struct work_struct *work)
 
 	flush_work(&hap->work);
 
-	mutex_lock(&hap->lock);
+	spin_lock(&hap->lock);
 	hrtimer_cancel(&hap->hap_timer);
 
 	if (value == 0) {
 		if (hap->state == 0) {
-			mutex_unlock(&hap->lock);
+			spin_unlock(&hap->lock);
 			return;
 		}
 		hap->state = 0;
@@ -1661,7 +1662,7 @@ static void qpnp_timed_enable_worker(struct work_struct *work)
 				 hap->timeout_ms : value);
 		hap->state = 1;
 	}
-	mutex_unlock(&hap->lock);
+	spin_unlock(&hap->lock);
 	if (hap->play_mode == QPNP_HAP_DIRECT)
 		qpnp_hap_set(hap, hap->state);
 	else
@@ -1755,7 +1756,7 @@ int qpnp_hap_play_byte(u8 data, bool on)
 }
 EXPORT_SYMBOL(qpnp_hap_play_byte);
 
-/* worker to opeate haptics */
+/* worker to operate haptics */
 static void qpnp_hap_worker(struct work_struct *work)
 {
 	struct qpnp_hap *hap = container_of(work, struct qpnp_hap,
@@ -2348,7 +2349,7 @@ static int qpnp_haptic_probe(struct spmi_device *spmi)
 			dev_err(&spmi->dev, "Failed to allocate workqueue\n");
 			return rc;
 	}
-	mutex_init(&hap->lock);
+	spin_lock_init(&hap->lock);
 	mutex_init(&hap->wf_lock);
 	mutex_init(&hap->set_lock);
 	spin_lock_init(&hap->td_lock);
@@ -2401,7 +2402,6 @@ sysfs_fail:
 timed_output_fail:
 	cancel_work_sync(&hap->work);
 	hrtimer_cancel(&hap->hap_timer);
-	mutex_destroy(&hap->lock);
 	mutex_destroy(&hap->wf_lock);
 
 	return rc;
@@ -2419,7 +2419,6 @@ static int qpnp_haptic_remove(struct spmi_device *spmi)
 	cancel_work_sync(&hap->work);
 	hrtimer_cancel(&hap->hap_timer);
 	timed_output_dev_unregister(&hap->timed_dev);
-	mutex_destroy(&hap->lock);
 	mutex_destroy(&hap->wf_lock);
 
 	return 0;
