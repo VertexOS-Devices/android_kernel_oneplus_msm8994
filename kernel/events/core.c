@@ -7210,9 +7210,6 @@ SYSCALL_DEFINE5(perf_event_open,
 	}
 
 	if (move_group) {
-<<<<<<< HEAD
-		gctx = group_leader->ctx;
-=======
 		gctx = __perf_event_ctx_lock_double(group_leader, ctx);
 
 		/*
@@ -7233,16 +7230,11 @@ SYSCALL_DEFINE5(perf_event_open,
 				move_group = 0;
 			}
 		}
->>>>>>> 34964f5f00035764257787e6cda3b84aefcb9038
 
 		/*
 		 * See perf_event_ctx_lock() for comments on the details
 		 * of swizzling perf_event::ctx.
 		 */
-<<<<<<< HEAD
-		mutex_lock_double(&gctx->mutex, &ctx->mutex);
-=======
->>>>>>> 34964f5f00035764257787e6cda3b84aefcb9038
 
 		perf_remove_from_context(group_leader, false);
 
@@ -7284,11 +7276,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	perf_unpin_context(ctx);
 
 	if (move_group) {
-<<<<<<< HEAD
-		mutex_unlock(&gctx->mutex);
-=======
 		perf_event_ctx_unlock(group_leader, gctx);
->>>>>>> 34964f5f00035764257787e6cda3b84aefcb9038
 		put_ctx(gctx);
 	}
 	mutex_unlock(&ctx->mutex);
