@@ -25,10 +25,10 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include "exfat_global.h"
-
 #include <linux/version.h>
 
+#include "exfat_config.h"
+#include "exfat_global.h"
 #include "exfat_data.h"
 #include "exfat_oal.h"
 
@@ -63,7 +63,7 @@ static UINT32 get_current_msec(void)
 }
 #define TIME_START()        do {__t1 = get_current_msec(); } while (0)
 #define TIME_END()          do {__t2 = get_current_msec(); } while (0)
-#define PRINT_TIME(n)       do {LOGI("Elapsed time %d = %d (usec)\n", n, (__t2 - __t1));} while (0)
+#define PRINT_TIME(n)       do {printk("[EXFAT] Elapsed time %d = %d (usec)\n", n, (__t2 - __t1)); } while (0)
 #else
 #define TIME_START()
 #define TIME_END()
@@ -326,7 +326,7 @@ INT32 ffsLookupFile(struct inode *inode, UINT8 *path, FILE_ID_T *fid)
 	struct super_block *sb = inode->i_sb;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
-	LOGD("entered\n");
+	PRINTK("ffsLookupFile entered\n");
 
 	ret = resolve_path(inode, path, &dir, &uni_name);
 	if (ret)
@@ -388,7 +388,7 @@ INT32 ffsLookupFile(struct inode *inode, UINT8 *path, FILE_ID_T *fid)
 	if (p_fs->dev_ejected)
 		return FFS_MEDIAERR;
 
-	LOGD("exited successfully\n");
+	PRINTK("ffsLookupFile exited successfully\n");
 
 	return FFS_SUCCESS;
 }
@@ -422,8 +422,7 @@ INT32 ffsCreateFile(struct inode *inode, UINT8 *path, UINT8 mode, FILE_ID_T *fid
 INT32 ffsReadFile(struct inode *inode, FILE_ID_T *fid, void *buffer, UINT64 count, UINT64 *rcount)
 {
 	INT32 offset, sec_offset, clu_offset;
-	UINT32 clu;
-	SECTOR LogSector;
+	UINT32 clu, LogSector;
 	UINT64 oneblkread, read_bytes;
 	struct buffer_head *tmp_bh = NULL;
 	struct super_block *sb = inode->i_sb;
@@ -510,8 +509,7 @@ INT32 ffsWriteFile(struct inode *inode, FILE_ID_T *fid, void *buffer, UINT64 cou
 {
 	INT32 modified = FALSE, offset, sec_offset, clu_offset;
 	INT32 num_clusters, num_alloc, num_alloced = (INT32) ~0;
-	UINT32 clu, last_clu;
-	SECTOR LogSector, sector;
+	UINT32 clu, last_clu, LogSector, sector;
 	UINT64 oneblkwrite, write_bytes;
 	CHAIN_T new_clu;
 	TIMESTAMP_T tm;
@@ -713,8 +711,7 @@ err_out:
 INT32 ffsTruncateFile(struct inode *inode, UINT64 old_size, UINT64 new_size)
 {
 	INT32 num_clusters;
-	UINT32 last_clu = CLUSTER_32(0);
-	SECTOR sector;
+	UINT32 last_clu = CLUSTER_32(0), sector;
 	CHAIN_T clu;
 	TIMESTAMP_T tm;
 	DENTRY_T *ep, *ep2;
@@ -728,9 +725,9 @@ INT32 ffsTruncateFile(struct inode *inode, UINT64 old_size, UINT64 new_size)
 		return FFS_PERMISSIONERR;
 
 	if (fid->size != old_size) {
-		LOGE("can't skip it because of size-mismatch."
-				" (old: %lld -> fid: %lld)\n",
-				old_size, fid->size);
+		printk(KERN_ERR "[EXFAT] truncate : can't skip it because of "
+				"size-mismatch(old:%lld->fid:%lld).\n"
+				,old_size, fid->size);
 	}
 
 	if (old_size <= new_size)
@@ -1002,8 +999,7 @@ INT32 ffsRemoveFile(struct inode *inode, FILE_ID_T *fid)
 
 INT32 ffsSetAttr(struct inode *inode, UINT32 attr)
 {
-	UINT32 type;
-	SECTOR sector;
+	UINT32 type, sector;
 	DENTRY_T *ep;
 	struct super_block *sb = inode->i_sb;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
@@ -1079,7 +1075,7 @@ INT32 ffsSetAttr(struct inode *inode, UINT32 attr)
 
 INT32 ffsGetStat(struct inode *inode, DIR_ENTRY_T *info)
 {
-	SECTOR sector;
+	UINT32 sector;
 	INT32 count;
 	CHAIN_T dir;
 	UNI_NAME_T uni_name;
@@ -1091,7 +1087,7 @@ INT32 ffsGetStat(struct inode *inode, DIR_ENTRY_T *info)
 	ENTRY_SET_CACHE_T *es=NULL;
 	UINT8 is_dir = (fid->type == TYPE_DIR) ? 1 : 0;
 
-	LOGD("entered\n");
+	PRINTK("ffsGetStat entered\n");
 
 	if (is_dir) {
 		if ((fid->dir.dir == p_fs->root_dir) &&
@@ -1159,7 +1155,7 @@ INT32 ffsGetStat(struct inode *inode, DIR_ENTRY_T *info)
 
 	*(uni_name.name) = 0x0;
 	p_fs->fs_func->get_uni_name_from_ext_entry(sb, &(fid->dir), fid->entry, uni_name.name);
-	if (*(uni_name.name) == 0x0 && p_fs->vol_type != EXFAT)
+	if (*(uni_name.name) == 0x0)
 		get_uni_name_from_dos_entry(sb, (DOS_DENTRY_T *) ep, &uni_name, 0x1);
 	nls_uniname_to_cstring(sb, info->Name, &uni_name);
 
@@ -1193,13 +1189,13 @@ INT32 ffsGetStat(struct inode *inode, DIR_ENTRY_T *info)
 	if (p_fs->dev_ejected)
 		return FFS_MEDIAERR;
 
-	LOGD("exited successfully\n");
+	PRINTK("ffsGetStat exited successfully\n");
 	return FFS_SUCCESS;
 }
 
 INT32 ffsSetStat(struct inode *inode, DIR_ENTRY_T *info)
 {
-	SECTOR sector;
+	UINT32 sector;
 	TIMESTAMP_T tm;
 	DENTRY_T *ep, *ep2;
 	ENTRY_SET_CACHE_T *es=NULL;
@@ -1272,8 +1268,7 @@ INT32 ffsSetStat(struct inode *inode, DIR_ENTRY_T *info)
 INT32 ffsMapCluster(struct inode *inode, INT32 clu_offset, UINT32 *clu)
 {
 	INT32 num_clusters, num_alloced, modified = FALSE;
-	UINT32 last_clu;
-	SECTOR sector;
+	UINT32 last_clu, sector;
 	CHAIN_T new_clu;
 	DENTRY_T *ep;
 	ENTRY_SET_CACHE_T *es = NULL;
@@ -1376,7 +1371,7 @@ INT32 ffsMapCluster(struct inode *inode, INT32 clu_offset, UINT32 *clu)
 			}
 		}
 
-		inode->i_blocks += num_alloced << (p_fs->cluster_size_bits - sb->s_blocksize_bits);
+		inode->i_blocks += num_alloced << (p_fs->cluster_size_bits - 9);
 	}
 
 	fid->hint_last_off = (INT32)(fid->rwoffset >> p_fs->cluster_size_bits);
@@ -1396,7 +1391,7 @@ INT32 ffsCreateDir(struct inode *inode, UINT8 *path, FILE_ID_T *fid)
 	struct super_block *sb = inode->i_sb;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
-	LOGD("entered\n");
+	PRINTK("ffsCreateDir entered\n");
 
 	ret = resolve_path(inode, path, &dir, &uni_name);
 	if (ret)
@@ -1421,8 +1416,7 @@ INT32 ffsReadDir(struct inode *inode, DIR_ENTRY_T *dir_entry)
 {
 	INT32 i, dentry, clu_offset;
 	INT32 dentries_per_clu, dentries_per_clu_bits = 0;
-	UINT32 type;
-	SECTOR sector;
+	UINT32 type, sector;
 	CHAIN_T dir, clu;
 	UNI_NAME_T uni_name;
 	TIMESTAMP_T tm;
@@ -1530,7 +1524,7 @@ INT32 ffsReadDir(struct inode *inode, DIR_ENTRY_T *dir_entry)
 
 			*(uni_name.name) = 0x0;
 			p_fs->fs_func->get_uni_name_from_ext_entry(sb, &dir, dentry, uni_name.name);
-			if (*(uni_name.name) == 0x0 && p_fs->vol_type != EXFAT)
+			if (*(uni_name.name) == 0x0)
 				get_uni_name_from_dos_entry(sb, (DOS_DENTRY_T *) ep, &uni_name, 0x1);
 			nls_uniname_to_cstring(sb, dir_entry->Name, &uni_name);
 			buf_unlock(sb, sector);
@@ -1755,10 +1749,11 @@ void fs_error(struct super_block *sb)
 	struct exfat_mount_options *opts = &EXFAT_SB(sb)->options;
 
 	if (opts->errors == EXFAT_ERRORS_PANIC)
-		PANIC("Filesystem panic from previous error\n");
+		panic("[EXFAT] Filesystem panic from previous error\n");
 	else if ((opts->errors == EXFAT_ERRORS_RO) && !(sb->s_flags & MS_RDONLY)) {
 		sb->s_flags |= MS_RDONLY;
-		LOGE("Filesystem has been set read-only\n");
+		printk(KERN_ERR "[EXFAT] Filesystem has been set read-only\n");
+		ST_LOG("[EXFAT] Filesystem has been set read-only\n");
 	}
 }
 
@@ -1926,7 +1921,7 @@ void fat_free_cluster(struct super_block *sb, CHAIN_T *p_chain, INT32 do_relse)
 	UINT32 clu, prev;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 
 	if ((p_chain->dir == CLUSTER_32(0)) || (p_chain->dir == CLUSTER_32(~0)))
 		return;
@@ -1967,14 +1962,15 @@ void exfat_free_cluster(struct super_block *sb, CHAIN_T *p_chain, INT32 do_relse
 	UINT32 clu;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 
 	if ((p_chain->dir == CLUSTER_32(0)) || (p_chain->dir == CLUSTER_32(~0)))
 		return;
 
 	if (p_chain->size <= 0) {
-		LOGE("skip free-req clu: %u, because of zero-size truncation\n",
-			p_chain->dir);
+		printk(KERN_ERR "[EXFAT] free_cluster : skip free-req clu:%u, "
+				"because of zero-size truncation\n"
+				,p_chain->dir);
 		return;
 	}
 
@@ -2126,8 +2122,7 @@ INT32 load_alloc_bitmap(struct super_block *sb)
 {
 	INT32 i, j, ret;
 	UINT32 map_size;
-	UINT32 type;
-	SECTOR sector;
+	UINT32 type, sector;
 	CHAIN_T clu;
 	BMAP_DENTRY_T *ep;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
@@ -2208,7 +2203,7 @@ void free_alloc_bitmap(struct super_block *sb)
 INT32 set_alloc_bitmap(struct super_block *sb, UINT32 clu)
 {
 	INT32 i, b;
-	SECTOR sector;
+	UINT32 sector;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	BD_INFO_T *p_bd = &(EXFAT_SB(sb)->bd_info);
 
@@ -2224,11 +2219,13 @@ INT32 set_alloc_bitmap(struct super_block *sb, UINT32 clu)
 
 INT32 clr_alloc_bitmap(struct super_block *sb, UINT32 clu)
 {
-	int ret;
 	INT32 i, b;
-	SECTOR sector;
+	UINT32 sector;
+#if EXFAT_CONFIG_DISCARD
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
 	struct exfat_mount_options *opts = &sbi->options;
+	int ret;
+#endif
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	BD_INFO_T *p_bd = &(EXFAT_SB(sb)->bd_info);
 
@@ -2241,6 +2238,7 @@ INT32 clr_alloc_bitmap(struct super_block *sb, UINT32 clu)
 
 	return (sector_write(sb, sector, p_fs->vol_amap[i], 0));
 
+#if EXFAT_CONFIG_DISCARD
 	if (opts->discard) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
 		ret = sb_issue_discard(sb, START_SECTOR(clu), (1 << p_fs->sectors_per_clu_bits));
@@ -2248,10 +2246,11 @@ INT32 clr_alloc_bitmap(struct super_block *sb, UINT32 clu)
 		ret = sb_issue_discard(sb, START_SECTOR(clu), (1 << p_fs->sectors_per_clu_bits), GFP_NOFS, 0);
 #endif
 		if (ret == -EOPNOTSUPP) {
-			LOGW("discard not supported by device, disabling");
+			printk(KERN_WARNING "discard not supported by device, disabling");
 			opts->discard = 0;
 		}
 	}
+#endif
 }
 
 UINT32 test_alloc_bitmap(struct super_block *sb, UINT32 clu)
@@ -2306,7 +2305,7 @@ void sync_alloc_bitmap(struct super_block *sb)
 	}
 }
 
-INT32 __load_upcase_table(struct super_block *sb, SECTOR sector, UINT64 num_sectors, UINT32 utbl_checksum)
+INT32 __load_upcase_table(struct super_block *sb, UINT32 sector, UINT32 num_sectors, UINT32 utbl_checksum)
 {
 	INT32 i, ret = FFS_ERROR;
 	UINT32 j;
@@ -2331,7 +2330,7 @@ INT32 __load_upcase_table(struct super_block *sb, SECTOR sector, UINT64 num_sect
 	while(sector < num_sectors) {
 		ret = sector_read(sb, sector, &tmp_bh, 1);
 		if (ret != FFS_SUCCESS) {
-			LOGW("sector read fail! (sector = 0x%lX)\n", sector);
+			PRINTK("sector read (0x%X)fail\n", sector);
 			goto error;
 		}
 		sector++;
@@ -2343,9 +2342,9 @@ INT32 __load_upcase_table(struct super_block *sb, SECTOR sector, UINT64 num_sect
 			checksum = ((checksum & 1) ? 0x80000000 : 0 ) + (checksum >> 1) + *(((UINT8 *) tmp_bh->b_data)+(i+1));
 
 			if(skip) {
-				LOGD("skip from 0x%X to 0x%X (amount of 0x%X)\n",
-					index, index + uni, uni);
+				PRINTK("skip from 0x%X ", index);
 				index += uni;
+				PRINTK("to 0x%X (amount of 0x%X)\n", index, uni);
 				skip = FALSE;
 			} else if(uni == index)
 				index++;
@@ -2355,7 +2354,7 @@ INT32 __load_upcase_table(struct super_block *sb, SECTOR sector, UINT64 num_sect
 				UINT16 col_index = get_col_index(index);
 
 				if(upcase_table[col_index]== NULL) {
-					LOGD("alloc = 0x%X\n", col_index);
+					PRINTK("alloc = 0x%X\n", col_index);
 					upcase_table[col_index] = (UINT16 *) MALLOC(UTBL_ROW_COUNT * sizeof(UINT16));
 					if(upcase_table[col_index] == NULL) {
 						ret = FFS_MEMORYERR;
@@ -2403,9 +2402,9 @@ INT32 __load_default_upcase_table(struct super_block *sb)
 	for(i = 0; index <= 0xFFFF && i < NUM_UPCASE*2; i += 2) {
 		uni = GET16(uni_upcase + i);
 		if(skip) {
-			LOGD("skip from 0x%X to 0x%X (amount of 0x%X)\n",
-				index, index + uni, uni);
+			PRINTK("skip from 0x%X ", index);
 			index += uni;
+			PRINTK("to 0x%X (amount of 0x%X)\n", index, uni);
 			skip = FALSE;
 		} else if(uni == index)
 			index++;
@@ -2415,7 +2414,7 @@ INT32 __load_default_upcase_table(struct super_block *sb)
 			UINT16 col_index = get_col_index(index);
 
 			if(upcase_table[col_index]== NULL) {
-				LOGD("alloc = 0x%X\n", col_index);
+				PRINTK("alloc = 0x%X\n", col_index);
 				upcase_table[col_index] = (UINT16 *) MALLOC(UTBL_ROW_COUNT * sizeof(UINT16));
 				if(upcase_table[col_index] == NULL) {
 					ret = FFS_MEMORYERR;
@@ -2443,9 +2442,7 @@ INT32 load_upcase_table(struct super_block *sb)
 {
 	INT32 i;
 	UINT32 tbl_clu, tbl_size;
-	UINT32 type;
-	SECTOR sector;
-	UINT64 num_sectors;
+	UINT32 type, sector, num_sectors;
 	CHAIN_T clu;
 	CASE_DENTRY_T *ep;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
@@ -2817,7 +2814,7 @@ void exfat_set_entry_time(DENTRY_T *p_entry, TIMESTAMP_T *tp, UINT8 mode)
 INT32 fat_init_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, UINT32 type,
 						 UINT32 start_clu, UINT64 size)
 {
-	SECTOR sector;
+	UINT32 sector;
 	DOS_DENTRY_T *dos_ep;
 	UINT8 tz_utc = EXFAT_SB(sb)->options.tz_utc;
 
@@ -2834,7 +2831,7 @@ INT32 fat_init_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, UI
 INT32 exfat_init_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, UINT32 type,
 						   UINT32 start_clu, UINT64 size)
 {
-	SECTOR sector;
+	UINT32 sector;
 	UINT8 flags;
 	FILE_DENTRY_T *file_ep;
 	STRM_DENTRY_T *strm_ep;
@@ -2863,7 +2860,7 @@ INT32 fat_init_ext_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, IN
 						 UNI_NAME_T *p_uniname, DOS_NAME_T *p_dosname)
 {
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 	UINT8 chksum;
 	UINT16 *uniname = p_uniname->name;
 	DOS_DENTRY_T *dos_ep;
@@ -2905,7 +2902,7 @@ INT32 exfat_init_ext_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, 
 						   UNI_NAME_T *p_uniname, DOS_NAME_T *p_dosname)
 {
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 	UINT16 *uniname = p_uniname->name;
 	FILE_DENTRY_T *file_ep;
 	STRM_DENTRY_T *strm_ep;
@@ -3047,7 +3044,7 @@ void init_name_entry(NAME_DENTRY_T *ep, UINT16 *uniname)
 void fat_delete_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, INT32 order, INT32 num_entries)
 {
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 	DENTRY_T *ep;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
@@ -3064,7 +3061,7 @@ void fat_delete_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, I
 void exfat_delete_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, INT32 order, INT32 num_entries)
 {
 	INT32 i;
-	SECTOR sector;
+	UINT32 sector;
 	DENTRY_T *ep;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
@@ -3081,7 +3078,7 @@ void exfat_delete_dir_entry(struct super_block *sb, CHAIN_T *p_dir, INT32 entry,
 void update_dir_checksum(struct super_block *sb, CHAIN_T *p_dir, INT32 entry)
 {
 	INT32 i, num_entries;
-	SECTOR sector;
+	UINT32 sector;
 	UINT16 chksum;
 	FILE_DENTRY_T *file_ep;
 	DENTRY_T *ep;
@@ -3118,7 +3115,7 @@ void update_dir_checksum_with_entry_set (struct super_block *sb, ENTRY_SET_CACHE
 
 	ep = (DENTRY_T *)&(es->__buf);
 	for (i=0; i < es->num_entries; i++) {
-		LOGD("ep %p\n", ep);
+		PRINTK ("update_dir_checksum_with_entry_set ep %p\n", ep);
 		chksum = calc_checksum_2byte((void *) ep, DENTRY_SIZE, chksum, chksum_type);
 		ep++;
 		chksum_type = CS_DEFAULT;
@@ -3152,7 +3149,7 @@ static INT32 _walk_fat_chain (struct super_block *sb, CHAIN_T *p_dir, INT32 byte
 		*clu = cur_clu;
 	return FFS_SUCCESS;
 }
-INT32 find_location(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, SECTOR *sector, INT32 *offset)
+INT32 find_location(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, UINT32 *sector, INT32 *offset)
 {
 	INT32 off, ret;
 	UINT32 clu=0;
@@ -3179,7 +3176,7 @@ INT32 find_location(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, SECTOR 
 	return FFS_SUCCESS;
 }
 
-DENTRY_T *get_entry_with_sector(struct super_block *sb, SECTOR sector, INT32 offset)
+DENTRY_T *get_entry_with_sector(struct super_block *sb, UINT32 sector, INT32 offset)
 {
 	UINT8 *buf;
 
@@ -3191,13 +3188,12 @@ DENTRY_T *get_entry_with_sector(struct super_block *sb, SECTOR sector, INT32 off
 	return((DENTRY_T *)(buf + offset));
 }
 
-DENTRY_T *get_entry_in_dir(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, SECTOR *sector)
+DENTRY_T *get_entry_in_dir(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, UINT32 *sector)
 {
-	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
-	UINT32 dentries_per_page = PAGE_SIZE >> DENTRY_SIZE_BITS;
 	INT32 off;
-	SECTOR sec;
+	UINT32 sec;
 	UINT8 *buf;
+	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
 	if (p_fs->dev_ejected)
 		return NULL;
@@ -3206,10 +3202,6 @@ DENTRY_T *get_entry_in_dir(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, 
 
 	if (find_location(sb, p_dir, entry, &sec, &off) != FFS_SUCCESS)
 		return NULL;
-
-	/* if first entry, then do read-ahead */
-	if (!(entry & (dentries_per_page - 1)))
-		buf_cache_readahead(sb, sec);
 
 	buf = buf_getblk(sb, sec);
 
@@ -3230,8 +3222,7 @@ ENTRY_SET_CACHE_T *get_entry_set_in_dir (struct super_block *sb, CHAIN_T *p_dir,
 {
 	INT32 off, ret, byte_offset;
 	UINT32 clu=0;
-	UINT32 entry_type;
-	SECTOR sec;
+	UINT32 sec, entry_type;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	BD_INFO_T *p_bd = &(EXFAT_SB(sb)->bd_info);
 	ENTRY_SET_CACHE_T *es = NULL;
@@ -3245,8 +3236,8 @@ ENTRY_SET_CACHE_T *get_entry_set_in_dir (struct super_block *sb, CHAIN_T *p_dir,
 
 	BUG_ON(p_dir->dir == DIR_DELETED);
 
-	LOGD("entered\n");
-	LOGD("p_dir dir %u flags %x size %d\n", p_dir->dir, p_dir->flags, p_dir->size);
+	PRINTK("get_entry_set_in_dir entered\n");
+	PRINTK("p_dir dir %u flags %x size %d\n", p_dir->dir, p_dir->flags, p_dir->size);
 
 	byte_offset = entry << DENTRY_SIZE_BITS;
 	ret =_walk_fat_chain(sb, p_dir, byte_offset, &clu);
@@ -3277,7 +3268,7 @@ ENTRY_SET_CACHE_T *get_entry_set_in_dir (struct super_block *sb, CHAIN_T *p_dir,
 	else
 		num_entries = type;
 
-	LOGD("trying to malloc %lx bytes for %d entries\n", offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T), num_entries);
+	PRINTK("trying to malloc %x bytes for %d entries\n", offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T), num_entries);
 	es = MALLOC(offsetof(ENTRY_SET_CACHE_T, __buf) + (num_entries)  * sizeof(DENTRY_T));
 	if (es == NULL)
 		goto err_out;
@@ -3365,12 +3356,12 @@ ENTRY_SET_CACHE_T *get_entry_set_in_dir (struct super_block *sb, CHAIN_T *p_dir,
 	if (file_ep)
 		*file_ep = (DENTRY_T *)&(es->__buf);
 
-	LOGD("es sec %u offset %d flags %d, num_entries %u buf ptr %p\n",
+	PRINTK("es sec %u offset %d flags %d, num_entries %u buf ptr %p\n",
 		   es->sector, es->offset, es->alloc_flag, es->num_entries, &(es->__buf));
-	LOGD("exited %p\n", es);
+	PRINTK("get_entry_set_in_dir exited %p\n", es);
 	return es;
 err_out:
-	LOGD("exited NULL (es %p)\n", es);
+	PRINTK("get_entry_set_in_dir exited NULL (es %p)\n", es);
 	if (es)
 		FREE(es);
 	return NULL;
@@ -3378,12 +3369,12 @@ err_out:
 
 void release_entry_set (ENTRY_SET_CACHE_T *es)
 {
-	LOGD("%p\n", es);
+	PRINTK("release_entry_set %p\n", es);
 	FREE(es);
 }
 
 
-static INT32 __write_partial_entries_in_entry_set (struct super_block *sb, ENTRY_SET_CACHE_T *es, SECTOR sec, INT32 off, UINT32 count)
+static INT32 __write_partial_entries_in_entry_set (struct super_block *sb, ENTRY_SET_CACHE_T *es, UINT32 sec, INT32 off, UINT32 count)
 {
 	INT32 num_entries, buf_off = (off - es->offset);
 	UINT32 remaining_byte_in_sector, copy_entries;
@@ -3392,8 +3383,8 @@ static INT32 __write_partial_entries_in_entry_set (struct super_block *sb, ENTRY
 	UINT32 clu;
 	UINT8 *buf, *esbuf = (UINT8 *)&(es->__buf);
 
-	LOGD("entered\n");
-	LOGD("es %p sec %u off %d count %d\n", es, sec, off, count);
+	PRINTK("__write_partial_entries_in_entry_set entered\n");
+	PRINTK("es %p sec %u off %d count %d\n", es, sec, off, count);
 	num_entries = count;
 
 	while(num_entries) {
@@ -3402,8 +3393,8 @@ static INT32 __write_partial_entries_in_entry_set (struct super_block *sb, ENTRY
 		buf = buf_getblk(sb, sec);
 		if (buf == NULL)
 			goto err_out;
-		LOGD("es->buf %p buf_off %u\n", esbuf, buf_off);
-		LOGD("copying %d entries from %p to sector %u\n", copy_entries, (esbuf + buf_off), sec);
+		PRINTK("es->buf %p buf_off %u\n", esbuf, buf_off);
+		PRINTK("copying %d entries from %p to sector %u\n", copy_entries, (esbuf + buf_off), sec);
 		MEMCPY(buf + off, esbuf + buf_off, copy_entries << DENTRY_SIZE_BITS);
 		buf_modify(sb, sec);
 		num_entries -= copy_entries;
@@ -3426,10 +3417,10 @@ static INT32 __write_partial_entries_in_entry_set (struct super_block *sb, ENTRY
 		}
 	}
 
-	LOGD("exited successfully\n");
+	PRINTK("__write_partial_entries_in_entry_set exited successfully\n");
 	return FFS_SUCCESS;
 err_out:
-	LOGD("failed\n");
+	PRINTK("__write_partial_entries_in_entry_set failed\n");
 	return FFS_ERROR;
 }
 
@@ -3562,8 +3553,7 @@ INT32 search_deleted_or_unused_entry(struct super_block *sb, CHAIN_T *p_dir, INT
 INT32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, INT32 num_entries)
 {
 	INT32 ret, dentry;
-	UINT32 last_clu;
-	SECTOR sector;
+	UINT32 last_clu, sector;
 	UINT64 size = 0;
 	CHAIN_T clu;
 	DENTRY_T *ep = NULL;
@@ -3635,7 +3625,7 @@ INT32 find_empty_entry(struct inode *inode, CHAIN_T *p_dir, INT32 num_entries)
 		EXFAT_I(inode)->mmu_private += p_fs->cluster_size;
 		EXFAT_I(inode)->fid.size += p_fs->cluster_size;
 		EXFAT_I(inode)->fid.flags = p_dir->flags;
-		inode->i_blocks += 1 << (p_fs->cluster_size_bits - sb->s_blocksize_bits);
+		inode->i_blocks += 1 << (p_fs->cluster_size_bits - 9);
 	}
 
 	return(dentry);
@@ -4750,7 +4740,7 @@ INT32 create_file(struct inode *inode, CHAIN_T *p_dir, UNI_NAME_T *p_uniname, UI
 void remove_file(struct inode *inode, CHAIN_T *p_dir, INT32 entry)
 {
 	INT32 num_entries;
-	SECTOR sector;
+	UINT32 sector;
 	DENTRY_T *ep;
 	struct super_block *sb = inode->i_sb;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
@@ -4776,7 +4766,7 @@ void remove_file(struct inode *inode, CHAIN_T *p_dir, INT32 entry)
 INT32 rename_file(struct inode *inode, CHAIN_T *p_dir, INT32 oldentry, UNI_NAME_T *p_uniname, FILE_ID_T *fid)
 {
 	INT32 ret, newentry = -1, num_old_entries, num_new_entries;
-	SECTOR sector_old, sector_new;
+	UINT32 sector_old, sector_new;
 	DOS_NAME_T dos_name;
 	DENTRY_T *epold, *epnew;
 	struct super_block *sb = inode->i_sb;
@@ -4864,7 +4854,7 @@ INT32 rename_file(struct inode *inode, CHAIN_T *p_dir, INT32 oldentry, UNI_NAME_
 INT32 move_file(struct inode *inode, CHAIN_T *p_olddir, INT32 oldentry, CHAIN_T *p_newdir, UNI_NAME_T *p_uniname, FILE_ID_T *fid)
 {
 	INT32 ret, newentry, num_new_entries, num_old_entries;
-	SECTOR sector_mov, sector_new;
+	UINT32 sector_mov, sector_new;
 	CHAIN_T clu;
 	DOS_NAME_T dos_name;
 	DENTRY_T *epmov, *epnew;
@@ -4956,13 +4946,13 @@ INT32 move_file(struct inode *inode, CHAIN_T *p_olddir, INT32 oldentry, CHAIN_T 
 	return FFS_SUCCESS;
 }
 
-INT32 sector_read(struct super_block *sb, SECTOR sec, struct buffer_head **bh, INT32 read)
+INT32 sector_read(struct super_block *sb, UINT32 sec, struct buffer_head **bh, INT32 read)
 {
 	INT32 ret = FFS_MEDIAERR;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
 	if ((sec >= (p_fs->PBR_sector+p_fs->num_sectors)) && (p_fs->num_sectors > 0)) {
-		LOGE("out of range error! (sec = 0x%lX)\n", sec);
+		PRINT("[EXFAT] sector_read: out of range error! (sec = %d)\n", sec);
 		fs_error(sb);
 		return ret;
 	}
@@ -4978,19 +4968,19 @@ INT32 sector_read(struct super_block *sb, SECTOR sec, struct buffer_head **bh, I
 	return ret;
 }
 
-INT32 sector_write(struct super_block *sb, SECTOR sec, struct buffer_head *bh, INT32 sync)
+INT32 sector_write(struct super_block *sb, UINT32 sec, struct buffer_head *bh, INT32 sync)
 {
 	INT32 ret = FFS_MEDIAERR;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
 	if (sec >= (p_fs->PBR_sector+p_fs->num_sectors) && (p_fs->num_sectors > 0)) {
-		LOGE("out of range error! (sec = 0x%lX)\n", sec);
+		PRINT("[EXFAT] sector_write: out of range error! (sec = %d)\n", sec);
 		fs_error(sb);
 		return ret;
 	}
 
 	if (bh == NULL) {
-		LOGE("bh is NULL!\n");
+		PRINT("[EXFAT] sector_write: bh is NULL!\n");
 		fs_error(sb);
 		return ret;
 	}
@@ -5006,13 +4996,13 @@ INT32 sector_write(struct super_block *sb, SECTOR sec, struct buffer_head *bh, I
 	return ret;
 }
 
-INT32 multi_sector_read(struct super_block *sb, SECTOR sec, struct buffer_head **bh, UINT32 num_secs, INT32 read)
+INT32 multi_sector_read(struct super_block *sb, UINT32 sec, struct buffer_head **bh, INT32 num_secs, INT32 read)
 {
 	INT32 ret = FFS_MEDIAERR;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
 	if (((sec+num_secs) > (p_fs->PBR_sector+p_fs->num_sectors)) && (p_fs->num_sectors > 0)) {
-		LOGE("out of range error! (sec = 0x%lX, num_secs = %u)\n", sec, num_secs);
+		PRINT("[EXFAT] multi_sector_read: out of range error! (sec = %d, num_secs = %d)\n", sec, num_secs);
 		fs_error(sb);
 		return ret;
 	}
@@ -5028,18 +5018,18 @@ INT32 multi_sector_read(struct super_block *sb, SECTOR sec, struct buffer_head *
 	return ret;
 }
 
-INT32 multi_sector_write(struct super_block *sb, SECTOR sec, struct buffer_head *bh, UINT32 num_secs, INT32 sync)
+INT32 multi_sector_write(struct super_block *sb, UINT32 sec, struct buffer_head *bh, INT32 num_secs, INT32 sync)
 {
 	INT32 ret = FFS_MEDIAERR;
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 
 	if ((sec+num_secs) > (p_fs->PBR_sector+p_fs->num_sectors) && (p_fs->num_sectors > 0)) {
-		LOGE("out of range error! (sec = 0x%lX, num_secs = %u)\n", sec, num_secs);
+		PRINT("[EXFAT] multi_sector_write: out of range error! (sec = %d, num_secs = %d)\n", sec, num_secs);
 		fs_error(sb);
 		return ret;
 	}
 	if (bh == NULL) {
-		LOGE("bh is NULL!\n");
+		PRINT("[EXFAT] multi_sector_write: bh is NULL!\n");
 		fs_error(sb);
 		return ret;
 	}

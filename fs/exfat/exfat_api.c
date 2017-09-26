@@ -16,12 +16,13 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include "exfat_global.h"
-
-#include <linux/module.h>
 #include <linux/version.h>
+#include <linux/module.h>
 #include <linux/init.h>
 
+#include "exfat_version.h"
+#include "exfat_config.h"
+#include "exfat_global.h"
 #include "exfat_data.h"
 #include "exfat_oal.h"
 
@@ -71,10 +72,7 @@ INT32 FsMountVol(struct super_block *sb)
 		if (!fs_struct[drv].mounted) break;
 	}
 
-	if (drv >= MAX_DRIVE) {
-		err = FFS_ERROR;
-		goto ret_unlock;
-	}
+	if (drv >= MAX_DRIVE) return(FFS_ERROR);
 
 	sm_P(&(fs_struct[drv].v_sem));
 
@@ -91,7 +89,7 @@ INT32 FsMountVol(struct super_block *sb)
 	} else {
 		buf_shutdown(sb);
 	}
-ret_unlock:
+
 	sm_V(&z_sem);
 
 	return(err);
@@ -231,11 +229,11 @@ INT32 FsTruncateFile(struct inode *inode, UINT64 old_size, UINT64 new_size)
 
 	sm_P(&(fs_struct[p_fs->drv].v_sem));
 
-	LOGD("entered (inode %p size %llu)\n", inode, new_size);
+	PRINTK("FsTruncateFile entered (inode %p size %llu)\n", inode, new_size);
 
 	err = ffsTruncateFile(inode, old_size, new_size);
 
-	LOGD("exited (%d)\n", err);
+	PRINTK("FsTruncateFile exitted (%d)\n", err);
 
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
 
@@ -314,13 +312,13 @@ INT32 FsWriteStat(struct inode *inode, DIR_ENTRY_T *info)
 
 	sm_P(&(fs_struct[p_fs->drv].v_sem));
 
-	LOGD("entered (inode %p info %p\n", inode, info);
+	PRINTK("FsWriteStat entered (inode %p info %p\n", inode, info);
 
 	err = ffsSetStat(inode, info);
 
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
 
-	LOGD("exited (%d)\n", err);
+	PRINTK("FsWriteStat exited (%d)\n", err);
 
 	return(err);
 }
@@ -411,6 +409,8 @@ INT32 FsRemoveEntry(struct inode *inode, FILE_ID_T *fid)
 	return(err);
 }
 
+
+
 EXPORT_SYMBOL(FsMountVol);
 EXPORT_SYMBOL(FsUmountVol);
 EXPORT_SYMBOL(FsGetVolInfo);
@@ -431,7 +431,7 @@ EXPORT_SYMBOL(FsReadDir);
 EXPORT_SYMBOL(FsRemoveDir);
 EXPORT_SYMBOL(FsRemoveEntry);
 
-#ifdef CONFIG_EXFAT_DEBUG
+#if EXFAT_CONFIG_KERNEL_DEBUG
 INT32 FsReleaseCache(struct super_block *sb)
 {
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
@@ -448,3 +448,30 @@ INT32 FsReleaseCache(struct super_block *sb)
 
 EXPORT_SYMBOL(FsReleaseCache);
 #endif
+
+static int __init init_exfat_core(void)
+{
+	int err;
+
+	printk(KERN_INFO "exFAT: Core Version %s\n", EXFAT_VERSION);
+
+	err = FsInit();
+	if (err) {
+		if (err == FFS_MEMORYERR)
+			return -ENOMEM;
+		else
+			return -EIO;
+	}
+
+	return 0;
+}
+
+static void __exit exit_exfat_core(void)
+{
+	FsShutdown();
+}
+
+module_init(init_exfat_core);
+module_exit(exit_exfat_core);
+
+MODULE_LICENSE("GPL");
