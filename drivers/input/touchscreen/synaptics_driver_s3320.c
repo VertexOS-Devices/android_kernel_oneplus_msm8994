@@ -1184,6 +1184,8 @@ static void gesture_judge(struct synaptics_ts_data *ts)
 }
 #endif
 /***************end****************/
+static char prlog_count = 0;
+
 void int_touch(void)
 {
         struct synaptics_ts_data *ts;
